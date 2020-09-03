@@ -27,11 +27,11 @@
 #                   Library imports                   #
 #-----------------------------------------------------#
 # External libraries
-from tensorflow.keras.models import Model
+from tensorflow.keras.s import Model
 from tensorflow.keras.layers import Input, concatenate
 from tensorflow.keras.layers import Conv3D, MaxPooling3D, Conv3DTranspose
 from tensorflow.keras.layers import Conv2D, MaxPooling2D, Conv2DTranspose
-from tensorflow.keras.layers import BatchNormalization
+from tensorflow.keras.layers import BatchNormalization, Dropout
 # Internal libraries/scripts
 from miscnn.neural_network.architecture.abstract_architecture import Abstract_Architecture
 
@@ -149,6 +149,7 @@ def contracting_layer_2D(input, neurons, ba_norm, ba_norm_momentum):
     conv2 = Conv2D(neurons, (3,3), activation='relu', padding='same')(conv1)
     if ba_norm : conv2 = BatchNormalization(momentum=ba_norm_momentum)(conv2)
     pool = MaxPooling2D(pool_size=(2, 2))(conv2)
+    model.add(Dropout(0.2)) 
     return pool, conv2
 
 # Create the middle layer between the contracting and expanding layers
@@ -178,8 +179,9 @@ def contracting_layer_3D(input, neurons, ba_norm, ba_norm_momentum):
     conv1 = Conv3D(neurons, (3,3,3), activation='relu', padding='same')(input)
     if ba_norm : conv1 = BatchNormalization(momentum=ba_norm_momentum)(conv1)
     conv2 = Conv3D(neurons, (3,3,3), activation='relu', padding='same')(conv1)
-    if ba_norm : conv2 = BatchNormalization(momentum=ba_norm_momentum)(conv2)
+    if ba_norm : conv2 = BatchNormalization(momentum=ba_norm_momentum)(conv2)   
     pool = MaxPooling3D(pool_size=(2, 2, 2))(conv2)
+    model.add(Dropout(0.2)) 
     return pool, conv2
 
 # Create the middle layer between the contracting and expanding layers
