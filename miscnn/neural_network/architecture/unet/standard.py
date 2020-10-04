@@ -27,7 +27,7 @@
 #                   Library imports                   #
 #-----------------------------------------------------#
 # External libraries
-from tensorflow.keras.s import Model
+from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Input, concatenate
 from tensorflow.keras.layers import Conv3D, MaxPooling3D, Conv3DTranspose
 from tensorflow.keras.layers import Conv2D, MaxPooling2D, Conv2DTranspose
@@ -39,7 +39,6 @@ from miscnn.neural_network.architecture.abstract_architecture import Abstract_Ar
 #         Architecture class: U-Net Standard          #
 #-----------------------------------------------------#
 """ The Standard variant of the popular U-Net architecture.
-
 Methods:
     __init__                Object creation function
     create_model_2D:        Creating the 2D U-Net standard model using Keras
@@ -49,8 +48,8 @@ class Architecture(Abstract_Architecture):
     #---------------------------------------------#
     #                Initialization               #
     #---------------------------------------------#
-    def __init__(self, n_filters=32, depth=4, activation='softmax',
-                 batch_normalization=True):
+    def __init__(self, n_filters=32, depth=6, activation='softmax',
+                 batch_normalization=True, dropout=True):
         # Parse parameter
         self.n_filters = n_filters
         self.depth = depth
@@ -58,6 +57,8 @@ class Architecture(Abstract_Architecture):
         # Batch normalization settings
         self.ba_norm = batch_normalization
         self.ba_norm_momentum = 0.99
+        self.dropout = dropout
+        self.dropout_percentage = 0.2
 
     #---------------------------------------------#
     #               Create 2D Model               #
@@ -116,7 +117,9 @@ class Architecture(Abstract_Architecture):
             neurons = self.n_filters * 2**i
             cnn_chain, last_conv = contracting_layer_3D(cnn_chain, neurons,
                                                         self.ba_norm,
-                                                        self.ba_norm_momentum)
+                                                        self.ba_norm_momentum,
+                                                        self.dropout,
+                                                        self.dropout_percentage)
             contracting_convs.append(last_conv)
 
         # Middle Layer
@@ -130,10 +133,12 @@ class Architecture(Abstract_Architecture):
             cnn_chain = expanding_layer_3D(cnn_chain, neurons,
                                            contracting_convs[i], self.ba_norm,
                                            self.ba_norm_momentum)
-
+        #print(cnn_chain.shape)
         # Output Layer
         conv_out = Conv3D(n_labels, (1, 1, 1),
                    activation=self.activation)(cnn_chain)
+        #print(conv_out.shape)  
+        #print(conv_out[:,:,:,:,1])         
         # Create Model with associated input and output layers
         model = Model(inputs=[inputs], outputs=[conv_out])
         # Return model
@@ -149,7 +154,6 @@ def contracting_layer_2D(input, neurons, ba_norm, ba_norm_momentum):
     conv2 = Conv2D(neurons, (3,3), activation='relu', padding='same')(conv1)
     if ba_norm : conv2 = BatchNormalization(momentum=ba_norm_momentum)(conv2)
     pool = MaxPooling2D(pool_size=(2, 2))(conv2)
-    model.add(Dropout(0.2)) 
     return pool, conv2
 
 # Create the middle layer between the contracting and expanding layers
@@ -175,13 +179,15 @@ def expanding_layer_2D(input, neurons, concatenate_link, ba_norm,
 #                   Subroutines 3D                    #
 #-----------------------------------------------------#
 # Create a contracting layer
-def contracting_layer_3D(input, neurons, ba_norm, ba_norm_momentum):
+def contracting_layer_3D(input, neurons, ba_norm, ba_norm_momentum, dropout, dropout_percentage):
     conv1 = Conv3D(neurons, (3,3,3), activation='relu', padding='same')(input)
     if ba_norm : conv1 = BatchNormalization(momentum=ba_norm_momentum)(conv1)
     conv2 = Conv3D(neurons, (3,3,3), activation='relu', padding='same')(conv1)
-    if ba_norm : conv2 = BatchNormalization(momentum=ba_norm_momentum)(conv2)   
+    if ba_norm : conv2 = BatchNormalization(momentum=ba_norm_momentum)(conv2)
     pool = MaxPooling3D(pool_size=(2, 2, 2))(conv2)
-    model.add(Dropout(0.2)) 
+    if dropout: 
+        layer = Dropout(dropout_percentage, input_shape=(input.shape))
+        pool = layer(pool, training=True)
     return pool, conv2
 
 # Create the middle layer between the contracting and expanding layers
