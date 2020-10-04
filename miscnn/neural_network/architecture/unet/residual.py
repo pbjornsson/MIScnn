@@ -33,7 +33,7 @@ from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Input, concatenate, add
 from tensorflow.keras.layers import Conv3D, MaxPooling3D, Conv3DTranspose
 from tensorflow.keras.layers import Conv2D, MaxPooling2D, Conv2DTranspose
-from tensorflow.keras.layers import BatchNormalization
+from tensorflow.keras.layers import BatchNormalization, Dropout
 # Internal libraries/scripts
 from miscnn.neural_network.architecture.abstract_architecture import Abstract_Architecture
 
@@ -52,8 +52,8 @@ class Architecture(Abstract_Architecture):
     #---------------------------------------------#
     #                Initialization               #
     #---------------------------------------------#
-    def __init__(self, n_filters=32, depth=4, activation='sigmoid',
-                 batch_normalization=True):
+    def __init__(self, n_filters=32, depth=6, activation='sigmoid',
+                 batch_normalization=True, dropout=True):
         # Parse parameter
         self.n_filters = n_filters
         self.depth = depth
@@ -61,6 +61,8 @@ class Architecture(Abstract_Architecture):
         # Batch normalization settings
         self.ba_norm = batch_normalization
         self.ba_norm_momentum = 0.99
+        self.dropout = dropout
+        self.dropout_percentage = 0.1
 
     #---------------------------------------------#
     #               Create 2D Model               #
@@ -119,7 +121,9 @@ class Architecture(Abstract_Architecture):
             neurons = self.n_filters * 2**i
             cnn_chain, last_conv = contracting_layer_3D(cnn_chain, neurons,
                                                         self.ba_norm,
-                                                        self.ba_norm_momentum)
+                                                        self.ba_norm_momentum,
+                                                        self.dropout,
+                                                        self.dropout_percentage)
             contracting_convs.append(last_conv)
 
         # Middle Layer
@@ -183,7 +187,7 @@ def expanding_layer_2D(input, neurons, concatenate_link, ba_norm,
 #                   Subroutines 3D                    #
 #-----------------------------------------------------#
 # Create a contracting layer
-def contracting_layer_3D(input, neurons, ba_norm, ba_norm_momentum):
+def contracting_layer_3D(input, neurons, ba_norm, ba_norm_momentum, dropout, dropout_percentage):
     conv1 = Conv3D(neurons, (3,3,3), activation='relu', padding='same')(input)
     if ba_norm : conv1 = BatchNormalization(momentum=ba_norm_momentum)(conv1)
     conv2 = Conv3D(neurons, (3,3,3), activation='relu', padding='same')(conv1)
@@ -191,6 +195,9 @@ def contracting_layer_3D(input, neurons, ba_norm, ba_norm_momentum):
     shortcut = Conv3D(neurons, (1, 1, 1), activation='relu', padding="same")(input)
     add_layer = add([shortcut, conv2])
     pool = MaxPooling3D(pool_size=(2, 2, 2))(add_layer)
+    if dropout: 
+        layer = Dropout(dropout_percentage, input_shape=(input.shape))
+        pool = layer(pool, training=True)
     return pool, add_layer
 
 # Create the middle layer between the contracting and expanding layers
